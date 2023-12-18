@@ -5,32 +5,28 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
-import numpy as np
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
-import time
+import numpy as np
 
 class SimpleNet(nn.Module):
     def __init__(self):
         super(SimpleNet, self).__init__()
-        self.fc1 = nn.Linear(32 * 32, 28*28)
-        self.fc2 = nn.Linear(28 * 28, 22 * 22)
-        self.fc3 = nn.Linear(22 * 22, 17 * 17)
-        self.fc4 = nn.Linear(17 * 17, 13 * 13)
-        self.fc5 = nn.Linear(13 * 13, 8 * 8)
-        self.fc6 = nn.Linear(8 * 8, 10)
+        self.drop_out = nn.Dropout()
+        self.fc1 = nn.Linear(in_features=32 * 32, out_features=512)
+        self.fc2 = nn.Linear(in_features=512, out_features=256)
+        self.fc3 = nn.Linear(in_features=256, out_features=128)
+        self.fc4 = nn.Linear(in_features=128, out_features=64)
+        self.fc5 = nn.Linear(in_features=64, out_features=32)
+        self.fc6 = nn.Linear(in_features=32, out_features=10)
 
     def forward(self, x):
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = nn.ReLU()(x)
-        x = self.fc2(x)
-        x = nn.ReLU()(x)
-        x = self.fc3(x)
-        x = nn.ReLU()(x)
-        x = self.fc4(x)
-        x = nn.ReLU()(x)
-        x = self.fc5(x)
-        x = nn.ReLU()(x)
+        x = torch.flatten(x, 1)  # flatten all dimensions except batch
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = F.relu(self.fc4(x))
+        x = F.relu(self.fc5(x))
         x = self.fc6(x)
         return x
 
@@ -51,16 +47,17 @@ def calculate_metrics(loader, model):
     f1 = f1_score(y_true, y_pred, average='macro')
     return accuracy, recall, precision, f1
 
-transform = transforms.Compose([transforms.ToTensor(), transforms.Grayscale(num_output_channels=1), transforms.Normalize((0.5,), (0.5,))])
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-valset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
-valloader = DataLoader(valset, batch_size=64, shuffle=False)
+
+transform = transforms.Compose([transforms.ToTensor(), transforms.Grayscale(), transforms.Normalize((0.5,), (0.5,))])
+trainset = torchvision.datasets.SVHN(root='./data', split="train", download=True, transform=transform)
+valset = torchvision.datasets.SVHN(root='./data', split="test", download=True, transform=transform)
+trainloader = DataLoader(trainset, batch_size=128, shuffle=True)
+valloader = DataLoader(valset, batch_size=128, shuffle=False)
 
 
 net = SimpleNet()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=0.0001)
+optimizer = optim.Adam(net.parameters(), lr=0.0005)
 
 plt.ion()
 
@@ -73,8 +70,8 @@ vali_recall = []
 vali_prec = []
 vali_f1 = []
 
-epochs_number = 20
-for epoch in range(epochs_number):
+
+for epoch in range(30):
     running_loss = 0.0
     net.train()
     for i, data in enumerate(trainloader, 0):
@@ -97,7 +94,7 @@ for epoch in range(epochs_number):
     val_acc, val_rec, val_prec, val_f1 = calculate_metrics(valloader, net)
     print(f'Validation - Accuracy: {val_acc}, Recall: {val_rec}, Precision: {val_prec}, F1 Score: {val_f1}')
 
-    x = [i for i in range(1, epoch+2)]
+    x = [i for i in range(1, epoch + 2)]
 
     tr_acc.append(train_acc)
     tr_recall.append(train_rec)
